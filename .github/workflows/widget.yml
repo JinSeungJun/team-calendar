@@ -1,0 +1,29 @@
+name: PC 위젯 빌드
+
+on:
+  push:
+    tags: ['widget-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: widget
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: 팀 캘린더 PC 위젯 ${{ github.ref_name }}
+          body: |
+            아래 Assets에서 **TeamCalendarWidget_v...exe** 를 받아 실행하세요. (설치 없이 바로 실행)
+            처음 실행 시 "Windows의 PC 보호" 창이 뜨면 → 추가 정보 → 실행
+          files: widget/dist/*.exe

@@ -1,0 +1,24 @@
+{
+  "name": "team-calendar-widget",
+  "productName": "TeamCalendarWidget",
+  "version": "1.0.0",
+  "description": "팀 캘린더 바탕화면 위젯",
+  "author": "JinSeungJun",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.3.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "io.github.jinseungjun.teamcalendar",
+    "productName": "TeamCalendarWidget",
+    "files": ["main.js", "offline.html", "icon.png"],
+    "win": { "target": "portable", "icon": "icon.png" },
+    "portable": { "artifactName": "TeamCalendarWidget_v${version}.exe" }
+  }
+}

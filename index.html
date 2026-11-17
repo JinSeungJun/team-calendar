@@ -77,6 +77,34 @@
   .gate h2 { margin:0 0 8px; font-size:18px; }
   .gate p { color:var(--sub); line-height:1.6; margin:0 0 14px; font-size:13px; }
   .hidden { display:none !important; }
+  /* ===== PC 위젯 모드 (?widget=1) ===== */
+  html.widget, html.widget body { background:transparent; height:100%; overflow:hidden; }
+  html.widget body { padding:0; }
+  html.widget #app { margin:6px; height:calc(100% - 12px); border-radius:12px; overflow:hidden; display:flex; flex-direction:column;
+    background:rgba(255,255,255,var(--walpha,.75)); border:1px solid rgba(255,255,255,.5); box-shadow:0 2px 14px rgba(0,0,0,.25); }
+  html.widget header { position:static; padding:6px 8px; gap:4px; flex-wrap:nowrap; background:transparent; border-bottom:1px solid rgba(0,0,0,.08); -webkit-app-region:drag; }
+  html.widget header button, html.widget header select { -webkit-app-region:no-drag; padding:3px 7px; font-size:12px; background:rgba(255,255,255,.7); }
+  html.widget header button.primary { background:var(--accent); }
+  html.widget h1, html.widget .filters, html.widget .me span, html.widget #addBtn .long, html.widget #newTeamBtn { display:none; }
+  html.widget #monthLabel { font-size:14px; min-width:auto; padding:0 2px; }
+  html.widget #sync { font-size:10px; }
+  html.widget .me select { padding:3px 4px; font-size:12px; max-width:76px; }
+  html.widget .empty-hint { margin:6px 6px 0; padding:6px 8px; font-size:12px; }
+  html.widget .grid { flex:1; margin:6px; grid-template-rows:auto; grid-auto-rows:minmax(0,1fr); background:rgba(0,0,0,.08); border-color:rgba(0,0,0,.06); }
+  html.widget .dow { background:transparent; padding:3px; font-size:11px; }
+  html.widget .day { min-height:0; overflow:hidden; padding:2px; background:rgba(255,255,255,.35); }
+  html.widget .day.other { background:rgba(255,255,255,.12); }
+  html.widget .day:hover { background:rgba(255,255,255,.6); }
+  html.widget .day .num { font-size:11px; padding:1px 4px; }
+  html.widget .day.today .num { padding:1px 6px; }
+  html.widget .ev { font-size:11px; padding:1px 4px; }
+  html.widget .ev .tag { display:none; }
+  html.widget .ev { border-left:4px solid var(--tc); }
+  html.widget .backdrop { border-radius:12px; margin:6px; }
+  html.widget .modal { max-height:100%; padding:14px; }
+  html.widget .gate { margin:6px; height:calc(100% - 12px); border-radius:12px; background:rgba(255,255,255,.95); -webkit-app-region:drag; }
+  html.widget .gate input, html.widget .gate button { -webkit-app-region:no-drag; }
+
   @media (max-width:640px) {
     h1 { display:none; }
     .day { min-height:72px; padding:2px; }
@@ -95,7 +123,7 @@
   <h2 id="gateTitle">팀 코드 입력</h2>
   <p id="gateText">팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요.</p>
   <div id="gateForm">
-    <div class="row"><div class="field"><input id="teamInput" placeholder="팀 코드" autocomplete="off"></div></div>
+    <div class="row"><div class="field"><input id="teamInput" placeholder="팀 코드 또는 초대 링크" autocomplete="off"></div></div>
     <div class="actions">
       <button id="newTeamBtn">새 팀 만들기</button>
       <div class="spacer"></div>
@@ -190,6 +218,8 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gsta
 import { getFirestore, collection, doc, onSnapshot, query, where, addDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const $ = (id) => document.getElementById(id);
+const WIDGET = new URLSearchParams(location.search).has('widget');
+if (WIDGET) document.documentElement.classList.add('widget');
 const PALETTE = ['#4F7DF3', '#E8743B', '#19A979', '#9B59B6', '#D64550', '#0E9AA7', '#C9A227', '#6B7280', '#E05FA3', '#3B5BA5'];
 const DEFAULT_TYPES = [
   { name: '회의', color: '#2F6FED' }, { name: '외근', color: '#D97706' },
@@ -232,7 +262,7 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('여기에')) {
 
   onAuthStateChanged(auth, (user) => {
     if (!user) return;
-    if (team) startTeam(team); else showGate('팀 코드 입력', '팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요. 처음 쓰는 거라면 "새 팀 만들기"를 누르세요.', true);
+    if (team) startTeam(team); else showGate('팀 코드 입력', WIDGET ? '웹 캘린더 ⚙ 설정의 "초대 링크"를 복사해서 아래에 붙여넣고 입장을 눌러 주세요. (처음 한 번만)' : '팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요. 처음 쓰는 거라면 "새 팀 만들기"를 누르세요.', true);
   });
   signInAnonymously(auth).catch((e) => {
     showGate('로그인 실패', 'Firebase 익명 로그인을 켰는지 확인해 주세요. (' + (e.code || e.message) + ')', false);
@@ -255,7 +285,9 @@ function randomCode() {
 
 $('newTeamBtn').onclick = () => { $('teamInput').value = randomCode(); $('gateErr').textContent = '새 코드를 만들었어요. 입장을 누르세요.'; };
 $('joinBtn').onclick = () => {
-  const v = $('teamInput').value.trim();
+  let v = $('teamInput').value.trim();
+  const lm = v.match(/team=([A-Za-z0-9_-]{16,64})/); // 초대 링크를 통째로 붙여넣어도 됨
+  if (lm) v = lm[1];
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(v)) { $('gateErr').textContent = '팀 코드는 영문·숫자 16자 이상이에요.'; return; }
   store('team', v); team = v; startTeam(v);
 };
@@ -264,7 +296,7 @@ $('teamInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('jo
 function startTeam(code) {
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
-  $('inviteLink').textContent = location.origin + location.pathname + '#team=' + code;
+  $('inviteLink').textContent = location.origin + location.pathname.replace(/index\.html$/, '') + '#team=' + code;
 
   if (unsubSettings) unsubSettings();
   unsubSettings = onSnapshot(doc(db, 'teams', code, 'meta', 'settings'), (snap) => {
@@ -349,7 +381,7 @@ function renderGrid() {
     html += '<div class="' + cls + '" data-date="' + k + '"><span class="num">' + d.getDate() + '</span>';
     list.forEach((e) => {
       const pc = colorOf(settings.people, e.person), tc = colorOf(settings.types, e.type);
-      html += '<div class="ev" data-id="' + esc(e.id) + '" style="background:' + esc(pc) + '" title="' + esc([e.person, e.type, e.title].filter(Boolean).join(' · ') + (e.memo ? '\n' + e.memo : '')) + '">'
+      html += '<div class="ev" data-id="' + esc(e.id) + '" style="background:' + esc(pc) + ';--tc:' + esc(tc) + '" title="' + esc([e.person, e.type, e.title].filter(Boolean).join(' · ') + (e.memo ? '\n' + e.memo : '')) + '">'
         + (e.type ? '<span class="tag" style="color:' + esc(tc) + '">' + esc(e.type) + '</span>' : '')
         + (e.time && e.start === k ? '<span class="tm">' + esc(e.time) + '</span>' : '')
         + esc(e.title) + '</div>';
@@ -519,7 +551,7 @@ $('filters').onclick = (e) => {
 };
 
 // 앱 설치(홈 화면 추가) 지원
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (!WIDGET && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
