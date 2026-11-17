@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">팀 캘린더</string>
+    <string name="widget_name">팀 캘린더 일정</string>
+    <string name="widget_desc">다가오는 팀 일정을 홈 화면에 보여줘요</string>
+</resources>

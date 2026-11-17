@@ -293,7 +293,25 @@ $('joinBtn').onclick = () => {
 };
 $('teamInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
 
+// ===== 안드로이드 앱 연결 (앱 안에서 열렸을 때만 동작) =====
+const APP = window.TeamCalApp || null;
+let pushTimer = null;
+function pushToApp() {
+  if (!APP) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    try {
+      const today = key(new Date());
+      const evs = events.filter((e) => (e.end || e.start) >= today)
+        .map(({ id, start, end, time, title, person, type }) => ({ id, start, end, time, title, person, type }));
+      APP.setData(JSON.stringify({ people: settings.people, types: settings.types, events: evs }));
+    } catch (e) {}
+  }, 300);
+}
+window.teamcalAdd = () => { if (team) openEvent({}); };
+
 function startTeam(code) {
+  try { APP && APP.setTeam(code); } catch (e) {}
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
   $('inviteLink').textContent = location.origin + location.pathname.replace(/index\.html$/, '') + '#team=' + code;
@@ -306,6 +324,7 @@ function startTeam(code) {
       types: (d && Array.isArray(d.types) && d.types.length) ? d.types : DEFAULT_TYPES
     };
     renderAll();
+    pushToApp();
   }, onError);
   subscribeEvents();
   renderAll();
@@ -329,6 +348,7 @@ function subscribeEvents() {
     $('sync').textContent = off ? '○ 오프라인' : '● 실시간';
     $('sync').classList.toggle('off', off);
     renderGrid();
+    if (!off) pushToApp();
   }, onError);
 }
 
@@ -523,14 +543,17 @@ document.querySelectorAll('.sadd').forEach((b) => { b.onclick = () => addRow(b.d
   });
 });
 $('copyInvite').onclick = async () => {
-  try { await navigator.clipboard.writeText($('inviteLink').textContent); $('copyInvite').textContent = '복사됨 ✓'; }
+  try {
+    if (APP) APP.copy($('inviteLink').textContent); else await navigator.clipboard.writeText($('inviteLink').textContent);
+    $('copyInvite').textContent = '복사됨 ✓';
+  }
   catch (e) { $('copyInvite').textContent = '직접 복사해 주세요'; }
   setTimeout(() => ($('copyInvite').textContent = '초대 링크 복사'), 2000);
 };
 $('leaveBtn').onclick = () => {
   const b = $('leaveBtn');
   if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 나가기'; return; }
-  store('team', null); location.reload();
+  store('team', null); try { APP && APP.setTeam(''); } catch (e) {} location.reload();
 };
 ['evModal', 'setModal'].forEach((id) => { $(id).onclick = (e) => { if (e.target.id === id) $(id).classList.remove('open'); }; });
 document.addEventListener('keydown', (e) => {

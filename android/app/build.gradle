@@ -1,0 +1,43 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.jinseungjun.teamcal'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'io.github.jinseungjun.teamcal'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file('teamcal.keystore')
+            storePassword 'teamcal-sideload'
+            keyAlias 'teamcal'
+            keyPassword 'teamcal-sideload'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "TeamCalendar_v${variant.versionName}.apk"
+        }
+    }
+}

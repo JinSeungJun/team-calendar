@@ -1,0 +1,54 @@
+name: 안드로이드 앱 빌드
+
+# android 폴더가 바뀌어서 main에 올라오면 자동 빌드 → Releases에 APK 업로드
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: 버전 읽기
+        id: ver
+        run: echo "version=$(grep -oP "versionName '\K[^']+" android/app/build.gradle)" >> "$GITHUB_OUTPUT"
+      - name: 빌드
+        run: |
+          set -o pipefail
+          gradle -p android assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+      - name: 실패 로그 저장 (build-log 브랜치)
+        if: failure()
+        run: |
+          mkdir -p /tmp/log
+          cp build.log /tmp/log/build.log 2>/dev/null || echo "no log" > /tmp/log/build.log
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout --orphan build-log
+          git rm -rf . > /dev/null
+          cp /tmp/log/build.log .
+          git add build.log
+          git commit -m "android build log ${{ github.sha }}"
+          git push -f origin build-log
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: 팀 캘린더 안드로이드 앱 v${{ steps.ver.outputs.version }}
+          make_latest: false
+          body: |
+            폰에서 아래 Assets의 **TeamCalendar_v${{ steps.ver.outputs.version }}.apk** 를 눌러 받고 설치하세요.
+            설치가 막히면: 설정 → '출처를 알 수 없는 앱 설치' → 사용 중인 브라우저(또는 내 파일) 허용
+          files: android/app/build/outputs/apk/release/*.apk
