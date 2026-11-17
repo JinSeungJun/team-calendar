@@ -301,8 +301,7 @@ function pushToApp() {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     try {
-      const today = key(new Date());
-      const evs = events.filter((e) => (e.end || e.start) >= today)
+      const evs = events
         .map(({ id, start, end, time, title, person, type }) => ({ id, start, end, time, title, person, type }));
       APP.setData(JSON.stringify({ people: settings.people, types: settings.types, events: evs }));
     } catch (e) {}

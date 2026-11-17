@@ -5,39 +5,67 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@drawable/widget_bg"
-    android:padding="12dp">
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="8dp">
 
     <LinearLayout
-        android:id="@+id/header"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="36dp"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
         <TextView
+            android:id="@+id/prev"
+            android:layout_width="34dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="◀"
+            android:textColor="#6B7280"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="팀 캘린더"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
             android:textColor="#1F2328"
             android:textSize="15sp"
             android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:maxLines="1" />
 
         <TextView
-            android:id="@+id/updated"
+            android:id="@+id/next"
+            android:layout_width="34dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="▶"
+            android:textColor="#6B7280"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/today"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#8A9099"
-            android:textSize="11sp"
-            android:layout_marginEnd="6dp" />
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="오늘"
+            android:textColor="#2F6FED"
+            android:textSize="12sp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
         <TextView
             android:id="@+id/refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="36dp"
+            android:layout_height="match_parent"
             android:gravity="center"
             android:text="↻"
             android:textColor="#2F6FED"
@@ -45,35 +73,20 @@
 
         <TextView
             android:id="@+id/add"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="36dp"
+            android:layout_height="match_parent"
             android:gravity="center"
             android:text="＋"
             android:textColor="#2F6FED"
-            android:textSize="18sp"
+            android:textSize="19sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <FrameLayout
+    <ImageView
+        android:id="@+id/cal"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="6dp">
-
-        <ListView
-            android:id="@+id/list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:divider="@null"
-            android:dividerHeight="0dp" />
-
-        <TextView
-            android:id="@+id/empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:text="다가오는 일정이 없어요"
-            android:textColor="#8A9099"
-            android:textSize="13sp" />
-    </FrameLayout>
+        android:scaleType="fitXY"
+        android:contentDescription="팀 달력" />
 </LinearLayout>

@@ -12,9 +12,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
 
 /**
  * 위젯용 데이터 가져오기 — Firebase SDK 없이 REST로 직접 호출
@@ -28,13 +25,12 @@ final class Api {
     static final String PROJECT = "onearch-team-calendar";
     static final String BASE = "https://firestore.googleapis.com/v1/projects/" + PROJECT + "/databases/(default)/documents/";
 
-    /** 팀 일정과 설정을 받아 캐시에 저장. 성공하면 true */
-    static boolean refresh(Context c) {
+    /** 팀 일정(from 이후에 끝나는 것)과 설정을 받아 캐시에 저장. 성공하면 true */
+    static boolean refresh(Context c, String from) {
         String team = Store.team(c);
         if (team.isEmpty()) return false;
         try {
             String token = idToken(c);
-            String today = new SimpleDateFormat("yyyy-MM-dd", Locale.KOREA).format(new Date());
 
             // 설정 (담당자·구분 색상)
             JSONObject out = new JSONObject();
@@ -52,10 +48,10 @@ final class Api {
             out.put("people", people);
             out.put("types", types);
 
-            // 오늘 이후에 끝나는 일정
+            // 달력 첫 칸 이후에 끝나는 일정
             String q = "{\"structuredQuery\":{\"from\":[{\"collectionId\":\"events\"}],"
                     + "\"where\":{\"fieldFilter\":{\"field\":{\"fieldPath\":\"end\"},\"op\":\"GREATER_THAN_OR_EQUAL\","
-                    + "\"value\":{\"stringValue\":\"" + today + "\"}}},\"limit\":300}}";
+                    + "\"value\":{\"stringValue\":\"" + from + "\"}}},\"limit\":500}}";
             JSONArray res = new JSONArray(http("POST", BASE + "teams/" + team + ":runQuery", q, token, "application/json"));
             JSONArray events = new JSONArray();
             for (int i = 0; i < res.length(); i++) {
