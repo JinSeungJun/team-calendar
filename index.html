@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6fed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="팀 캘린더">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>팀 캘린더</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --line:#e3e6ea; --text:#1f2328; --sub:#6b7280; --accent:#2f6fed; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { font-family:-apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif; background:var(--bg); color:var(--text); font-size:14px; padding-bottom:env(safe-area-inset-bottom); }
+  header { display:flex; align-items:center; gap:8px; padding:10px 14px; padding-top:max(10px, env(safe-area-inset-top)); background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  h1 { font-size:16px; margin:0 8px 0 0; white-space:nowrap; }
+  #monthLabel { font-size:17px; font-weight:700; min-width:110px; text-align:center; }
+  button, select, input, textarea { font:inherit; color:inherit; }
+  button { border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 11px; cursor:pointer; }
+  button:hover { background:#f3f4f6; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.primary:hover { background:#2459c7; }
+  button.danger { color:#c0392b; border-color:#efc2bc; }
+  button.danger.armed { background:#c0392b; color:#fff; }
+  .spacer { flex:1; }
+  #sync { color:#16a34a; font-size:12px; white-space:nowrap; }
+  #sync.off { color:#c0392b; }
+  .me { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--sub); }
+  .me select { padding:5px 6px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .filters { display:flex; gap:6px; flex-wrap:wrap; padding:8px 14px; background:var(--card); border-bottom:1px solid var(--line); align-items:center; }
+  .filters .lbl { color:var(--sub); font-size:12px; margin:0 2px 0 8px; }
+  .filters .lbl:first-child { margin-left:0; }
+  .chip { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:12px; cursor:pointer; user-select:none; background:#fff; }
+  .chip .dot { width:9px; height:9px; border-radius:50%; }
+  .chip.off { opacity:.35; }
+  .grid { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:1px; background:var(--line); margin:12px 14px 24px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .dow { background:#fafbfc; padding:7px; text-align:center; font-size:12px; color:var(--sub); font-weight:600; }
+  .dow.sun { color:#d14; } .dow.sat { color:#2563eb; }
+  .day { background:var(--card); min-height:110px; padding:4px; cursor:pointer; display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .day:hover { background:#fbfcff; }
+  .day.other { background:#fafbfc; }
+  .day.other .num { color:#bcc2ca !important; }
+  .day .num { font-size:12px; font-weight:600; padding:2px 5px; align-self:flex-start; }
+  .day.sun .num { color:#d14; } .day.sat .num { color:#2563eb; }
+  .day.today .num { background:var(--accent); color:#fff !important; border-radius:10px; padding:2px 7px; }
+  .ev { font-size:12px; border-radius:4px; padding:2px 5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; line-height:1.45; }
+  .ev:hover { filter:brightness(.93); }
+  .ev .tag { display:inline-block; font-size:10px; padding:0 4px; border-radius:3px; background:#fff; margin-right:4px; font-weight:700; }
+  .ev .tm { opacity:.9; margin-right:3px; }
+  .empty-hint { margin:0 14px; padding:10px 12px; background:#fff8e1; border:1px solid #f3df9b; border-radius:8px; font-size:13px; }
+  /* 모달 */
+  .backdrop { position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; z-index:10; padding:16px; }
+  .backdrop.open { display:flex; }
+  .modal { background:#fff; border-radius:10px; width:100%; max-width:440px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.2); max-height:92vh; overflow:auto; }
+  .modal h2 { margin:0 0 14px; font-size:16px; }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  .field { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+  .field label { font-size:12px; color:var(--sub); }
+  .field input, .field select, .field textarea { border:1px solid var(--line); border-radius:6px; padding:7px 8px; width:100%; background:#fff; }
+  .field textarea { resize:vertical; min-height:56px; }
+  .help { font-size:12px; color:var(--sub); line-height:1.5; }
+  .actions { display:flex; gap:8px; margin-top:6px; align-items:center; }
+  .meta { font-size:11px; color:var(--sub); margin-top:8px; }
+  .err { color:#c0392b; font-size:12px; min-height:16px; }
+  code.big { display:block; background:#f3f4f6; padding:8px 10px; border-radius:6px; font-size:13px; word-break:break-all; margin:6px 0; }
+  /* 시작 화면 */
+  .gate { max-width:420px; margin:12vh auto 0; background:#fff; border:1px solid var(--line); border-radius:12px; padding:24px; }
+  .gate h2 { margin:0 0 8px; font-size:18px; }
+  .gate p { color:var(--sub); line-height:1.6; margin:0 0 14px; font-size:13px; }
+  .hidden { display:none !important; }
+  @media (max-width:640px) {
+    h1 { display:none; }
+    .day { min-height:72px; padding:2px; }
+    .ev { font-size:11px; padding:1px 3px; }
+    .ev .tag, .ev .tm { display:none; }
+    .grid { margin:8px 6px 20px; }
+    .me span { display:none; }
+    #addBtn .long { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 설정 안 됨 / 팀 코드 입력 화면 -->
+<div class="gate hidden" id="gate">
+  <h2 id="gateTitle">팀 코드 입력</h2>
+  <p id="gateText">팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요.</p>
+  <div id="gateForm">
+    <div class="row"><div class="field"><input id="teamInput" placeholder="팀 코드" autocomplete="off"></div></div>
+    <div class="actions">
+      <button id="newTeamBtn">새 팀 만들기</button>
+      <div class="spacer"></div>
+      <button class="primary" id="joinBtn">입장</button>
+    </div>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1 id="appTitle">📅 팀 캘린더</h1>
+    <button id="prev" aria-label="이전 달">◀</button>
+    <div id="monthLabel"></div>
+    <button id="next" aria-label="다음 달">▶</button>
+    <button id="today">오늘</button>
+    <div class="spacer"></div>
+    <span id="sync">연결 중…</span>
+    <div class="me"><span>나</span><select id="meSel"></select></div>
+    <button id="settingsBtn" aria-label="설정">⚙</button>
+    <button class="primary" id="addBtn">+<span class="long"> 일정 추가</span></button>
+  </header>
+  <div class="filters" id="filters"></div>
+  <div class="empty-hint hidden" id="noPeopleHint">⚙ 설정에서 팀원 이름과 색상을 먼저 등록해 주세요.</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- 일정 모달 -->
+<div class="backdrop" id="evModal">
+  <div class="modal">
+    <h2 id="mTitle">일정 추가</h2>
+    <div class="row"><div class="field"><label>제목 *</label><input id="fTitle" maxlength="100"></div></div>
+    <div class="row">
+      <div class="field"><label>시작일 *</label><input type="date" id="fStart"></div>
+      <div class="field"><label>종료일</label><input type="date" id="fEnd"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>시간 (선택)</label><input type="time" id="fTime"></div>
+      <div class="field"><label>담당자</label><select id="fPerson"></select></div>
+      <div class="field"><label>구분</label><select id="fType"></select></div>
+    </div>
+    <div class="row"><div class="field"><label>메모</label><textarea id="fMemo" maxlength="1000"></textarea></div></div>
+    <div class="err" id="fErr"></div>
+    <div class="actions">
+      <button class="danger" id="delBtn">삭제</button>
+      <div class="spacer"></div>
+      <button id="cancelBtn">취소</button>
+      <button class="primary" id="saveBtn">저장</button>
+    </div>
+    <div class="meta" id="fMeta"></div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div class="backdrop" id="setModal">
+  <div class="modal">
+    <h2>설정</h2>
+    <div class="row"><div class="field">
+      <label>팀원 (한 줄에 한 명: 이름 색상)</label>
+      <textarea id="sPeople" rows="5" placeholder="홍길동 #4F7DF3&#10;김철수 #E8743B"></textarea>
+    </div></div>
+    <div class="row"><div class="field">
+      <label>구분 (한 줄에 하나: 이름 색상)</label>
+      <textarea id="sTypes" rows="5" placeholder="회의 #2F6FED&#10;외근 #D97706"></textarea>
+    </div></div>
+    <div class="help">색상은 생략하면 자동으로 정해져요. 색상 코드는 # 다음 6자리 (예: #E8743B)</div>
+    <div class="err" id="sErr"></div>
+    <div class="actions">
+      <div class="spacer"></div>
+      <button id="sCancel">닫기</button>
+      <button class="primary" id="sSave">저장</button>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <div class="field">
+      <label>팀원 초대 링크 (이 링크로 들어오면 팀 코드 입력 없이 바로 입장)</label>
+      <code class="big" id="inviteLink"></code>
+    </div>
+    <div class="actions">
+      <button id="copyInvite">초대 링크 복사</button>
+      <div class="spacer"></div>
+      <button class="danger" id="leaveBtn">이 기기에서 팀 나가기</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { firebaseConfig, APP_TITLE } from './config.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, doc, onSnapshot, query, where, addDoc, setDoc, deleteDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const $ = (id) => document.getElementById(id);
+const PALETTE = ['#4F7DF3', '#E8743B', '#19A979', '#9B59B6', '#D64550', '#0E9AA7', '#C9A227', '#6B7280', '#E05FA3', '#3B5BA5'];
+const DEFAULT_TYPES = [
+  { name: '회의', color: '#2F6FED' }, { name: '외근', color: '#D97706' },
+  { name: '휴가', color: '#DC2626' }, { name: '마감', color: '#7C3AED' }, { name: '기타', color: '#6B7280' }
+];
+
+function load(k) { try { return localStorage.getItem('teamcal_' + k); } catch (e) { return null; } }
+function store(k, v) { try { v == null ? localStorage.removeItem('teamcal_' + k) : localStorage.setItem('teamcal_' + k, v); } catch (e) {} }
+const pad = (n) => (n < 10 ? '0' : '') + n;
+const key = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const colorOf = (list, name) => (list.find((x) => x.name === name) || {}).color || '#6b7280';
+const isHex = (c) => /^#[0-9a-fA-F]{6}$/.test(c);
+
+$('appTitle').textContent = '📅 ' + APP_TITLE;
+document.title = APP_TITLE;
+
+// ===== 상태 =====
+let db, auth, team = null;
+let settings = { people: [], types: DEFAULT_TYPES };
+let events = [];
+let cur = new Date(); cur.setDate(1);
+const hidePeople = new Set(), hideTypes = new Set();
+let me = load('me') || '';
+let editing = null;
+let unsubEvents = null, unsubSettings = null;
+
+// ===== 시작 =====
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('여기에')) {
+  showGate('설정이 아직 안 됐어요', 'config.js 파일에 Firebase 설정값을 넣어 주세요. (세팅 가이드 참고)', false);
+} else {
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+
+  // 초대 링크(#team=코드)로 들어온 경우
+  const m = location.hash.match(/team=([A-Za-z0-9_-]{16,64})/);
+  if (m) { store('team', m[1]); history.replaceState(null, '', location.pathname + location.search); }
+  team = load('team');
+
+  onAuthStateChanged(auth, (user) => {
+    if (!user) return;
+    if (team) startTeam(team); else showGate('팀 코드 입력', '팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요. 처음 쓰는 거라면 "새 팀 만들기"를 누르세요.', true);
+  });
+  signInAnonymously(auth).catch((e) => {
+    showGate('로그인 실패', 'Firebase 익명 로그인을 켰는지 확인해 주세요. (' + (e.code || e.message) + ')', false);
+  });
+}
+
+function showGate(title, text, withForm) {
+  $('app').classList.add('hidden');
+  $('gate').classList.remove('hidden');
+  $('gateTitle').textContent = title;
+  $('gateText').textContent = text;
+  $('gateForm').classList.toggle('hidden', !withForm);
+}
+
+function randomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const arr = new Uint32Array(20); crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => chars[n % chars.length]).join('');
+}
+
+$('newTeamBtn').onclick = () => { $('teamInput').value = randomCode(); $('gateErr').textContent = '새 코드를 만들었어요. 입장을 누르세요.'; };
+$('joinBtn').onclick = () => {
+  const v = $('teamInput').value.trim();
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(v)) { $('gateErr').textContent = '팀 코드는 영문·숫자 16자 이상이에요.'; return; }
+  store('team', v); team = v; startTeam(v);
+};
+$('teamInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click(); });
+
+function startTeam(code) {
+  $('gate').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('inviteLink').textContent = location.origin + location.pathname + '#team=' + code;
+
+  if (unsubSettings) unsubSettings();
+  unsubSettings = onSnapshot(doc(db, 'teams', code, 'meta', 'settings'), (snap) => {
+    const d = snap.data();
+    settings = {
+      people: (d && Array.isArray(d.people)) ? d.people : [],
+      types: (d && Array.isArray(d.types) && d.types.length) ? d.types : DEFAULT_TYPES
+    };
+    renderAll();
+  }, onError);
+  subscribeEvents();
+  renderAll();
+}
+
+// 보이는 달의 시작일 이후에 끝나는 일정만 구독 (읽기 횟수 절약)
+let subscribedFrom = null;
+function gridStartKey() {
+  const first = new Date(cur.getFullYear(), cur.getMonth(), 1);
+  return key(new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay()));
+}
+function subscribeEvents() {
+  const from = gridStartKey();
+  if (subscribedFrom && from >= subscribedFrom && unsubEvents) return; // 이미 범위 포함
+  if (unsubEvents) unsubEvents();
+  subscribedFrom = from;
+  const q = query(collection(db, 'teams', team, 'events'), where('end', '>=', from));
+  unsubEvents = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+    events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const off = snap.metadata.fromCache;
+    $('sync').textContent = off ? '○ 오프라인' : '● 실시간';
+    $('sync').classList.toggle('off', off);
+    renderGrid();
+  }, onError);
+}
+
+function onError(e) {
+  console.error(e);
+  $('sync').textContent = '⚠ ' + (e.code === 'permission-denied' ? '권한 없음' : '연결 오류');
+  $('sync').classList.add('off');
+}
+
+// ===== 렌더링 =====
+function renderAll() { renderMe(); renderFilters(); renderGrid(); }
+
+function renderMe() {
+  let html = '<option value="">선택</option>';
+  settings.people.forEach((p) => { html += '<option' + (p.name === me ? ' selected' : '') + '>' + esc(p.name) + '</option>'; });
+  $('meSel').innerHTML = html;
+  $('noPeopleHint').classList.toggle('hidden', settings.people.length > 0);
+}
+
+function renderFilters() {
+  let html = '<span class="lbl">담당자</span>';
+  settings.people.forEach((p) => {
+    html += '<span class="chip' + (hidePeople.has(p.name) ? ' off' : '') + '" data-kind="p" data-name="' + esc(p.name) + '"><span class="dot" style="background:' + esc(p.color) + '"></span>' + esc(p.name) + '</span>';
+  });
+  html += '<span class="lbl">구분</span>';
+  settings.types.forEach((t) => {
+    html += '<span class="chip' + (hideTypes.has(t.name) ? ' off' : '') + '" data-kind="t" data-name="' + esc(t.name) + '"><span class="dot" style="background:' + esc(t.color) + '"></span>' + esc(t.name) + '</span>';
+  });
+  $('filters').innerHTML = html;
+}
+
+function renderGrid() {
+  const y = cur.getFullYear(), m = cur.getMonth();
+  $('monthLabel').textContent = y + '년 ' + (m + 1) + '월';
+  const first = new Date(y, m, 1);
+  const weeks = Math.ceil((first.getDay() + new Date(y, m + 1, 0).getDate()) / 7);
+  const todayKey = key(new Date());
+  const vis = events.filter((e) => !hidePeople.has(e.person) && !hideTypes.has(e.type));
+
+  let html = '';
+  ['일', '월', '화', '수', '목', '금', '토'].forEach((d, i) => {
+    html += '<div class="dow' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + d + '</div>';
+  });
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(y, m, 1 - first.getDay() + i);
+    const k = key(d), dow = d.getDay();
+    const cls = 'day' + (d.getMonth() !== m ? ' other' : '') + (k === todayKey ? ' today' : '') + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+    const list = vis.filter((e) => e.start <= k && k <= e.end)
+      .sort((a, b) => (a.time || '99').localeCompare(b.time || '99') || String(a.title).localeCompare(String(b.title)));
+    html += '<div class="' + cls + '" data-date="' + k + '"><span class="num">' + d.getDate() + '</span>';
+    list.forEach((e) => {
+      const pc = colorOf(settings.people, e.person), tc = colorOf(settings.types, e.type);
+      html += '<div class="ev" data-id="' + esc(e.id) + '" style="background:' + esc(pc) + '" title="' + esc([e.person, e.type, e.title].filter(Boolean).join(' · ') + (e.memo ? '\n' + e.memo : '')) + '">'
+        + (e.type ? '<span class="tag" style="color:' + esc(tc) + '">' + esc(e.type) + '</span>' : '')
+        + (e.time && e.start === k ? '<span class="tm">' + esc(e.time) + '</span>' : '')
+        + esc(e.title) + '</div>';
+    });
+    html += '</div>';
+  }
+  $('grid').innerHTML = html;
+}
+
+// ===== 일정 모달 =====
+function fillSelect(sel, list, value) {
+  let html = '<option value="">-</option>';
+  list.forEach((x) => { html += '<option' + (x.name === value ? ' selected' : '') + '>' + esc(x.name) + '</option>'; });
+  sel.innerHTML = html;
+}
+
+function openEvent(ev) {
+  editing = ev.id ? ev : null;
+  $('mTitle').textContent = editing ? '일정 수정' : '일정 추가';
+  $('fTitle').value = ev.title || '';
+  $('fStart').value = ev.start || key(new Date());
+  $('fEnd').value = ev.end || ev.start || key(new Date());
+  $('fTime').value = ev.time || '';
+  fillSelect($('fPerson'), settings.people, editing ? ev.person : me);
+  fillSelect($('fType'), settings.types, editing ? ev.type : '');
+  $('fMemo').value = ev.memo || '';
+  $('fErr').textContent = '';
+  $('fMeta').textContent = editing && ev.editor ? '마지막 수정: ' + ev.editor : '';
+  $('delBtn').style.display = editing ? '' : 'none';
+  $('delBtn').classList.remove('armed'); $('delBtn').textContent = '삭제';
+  setBusy(false);
+  $('evModal').classList.add('open');
+  if (matchMedia('(min-width:641px)').matches) setTimeout(() => $('fTitle').focus(), 30);
+}
+const closeEvent = () => { $('evModal').classList.remove('open'); editing = null; };
+function setBusy(b) { $('saveBtn').disabled = b; $('delBtn').disabled = b; $('saveBtn').textContent = b ? '저장 중…' : '저장'; }
+
+async function saveEvent() {
+  const ev = {
+    title: $('fTitle').value.trim(),
+    start: $('fStart').value,
+    end: $('fEnd').value || $('fStart').value,
+    time: $('fTime').value || '',
+    person: $('fPerson').value,
+    type: $('fType').value,
+    memo: $('fMemo').value.trim(),
+    editor: me || '',
+    updatedAt: serverTimestamp()
+  };
+  if (!ev.title) return ($('fErr').textContent = '제목을 입력해 주세요.');
+  if (!ev.start) return ($('fErr').textContent = '시작일을 입력해 주세요.');
+  if (ev.end < ev.start) return ($('fErr').textContent = '종료일이 시작일보다 빨라요.');
+  setBusy(true);
+  try {
+    // 오프라인이어도 바로 화면에 반영되고, 연결되면 자동 전송돼요
+    const p = editing ? setDoc(doc(db, 'teams', team, 'events', editing.id), ev) : addDoc(collection(db, 'teams', team, 'events'), ev);
+    closeEvent();
+    await p;
+  } catch (e) {
+    setBusy(false); onError(e);
+    alertBox('저장 실패: ' + (e.code || e.message));
+  }
+}
+
+async function deleteEvent() {
+  const b = $('delBtn');
+  if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 삭제'; return; }
+  const id = editing.id;
+  closeEvent();
+  try { await deleteDoc(doc(db, 'teams', team, 'events', id)); }
+  catch (e) { onError(e); alertBox('삭제 실패: ' + (e.code || e.message)); }
+}
+
+function alertBox(msg) { $('sync').textContent = '⚠ ' + msg; $('sync').classList.add('off'); }
+
+// ===== 설정 모달 =====
+function toLines(list) { return list.map((x) => x.name + ' ' + x.color).join('\n'); }
+function parseLines(text) {
+  const out = [], seen = new Set();
+  text.split('\n').forEach((line) => {
+    const t = line.trim(); if (!t) return;
+    const mm = t.match(/^(.*?)[\s,]*(#[0-9a-fA-F]{6})?$/);
+    const name = (mm ? mm[1] : t).trim().slice(0, 30);
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    out.push({ name, color: mm && mm[2] && isHex(mm[2]) ? mm[2].toUpperCase() : PALETTE[out.length % PALETTE.length] });
+  });
+  return out;
+}
+function openSettings() {
+  $('sPeople').value = toLines(settings.people);
+  $('sTypes').value = toLines(settings.types);
+  $('sErr').textContent = '';
+  $('setModal').classList.add('open');
+}
+async function saveSettings() {
+  const people = parseLines($('sPeople').value), types = parseLines($('sTypes').value);
+  if (!types.length) return ($('sErr').textContent = '구분은 최소 1개 있어야 해요.');
+  try {
+    const p = setDoc(doc(db, 'teams', team, 'meta', 'settings'), { people, types, updatedAt: serverTimestamp() });
+    $('setModal').classList.remove('open');
+    await p;
+  } catch (e) { onError(e); alertBox('설정 저장 실패: ' + (e.code || e.message)); }
+}
+
+// ===== 이벤트 바인딩 =====
+$('prev').onclick = () => { cur.setMonth(cur.getMonth() - 1); subscribeEvents(); renderGrid(); };
+$('next').onclick = () => { cur.setMonth(cur.getMonth() + 1); renderGrid(); };
+$('today').onclick = () => { cur = new Date(); cur.setDate(1); subscribeEvents(); renderGrid(); };
+$('addBtn').onclick = () => openEvent({});
+$('meSel').onchange = (e) => { me = e.target.value; store('me', me); };
+$('cancelBtn').onclick = closeEvent;
+$('saveBtn').onclick = saveEvent;
+$('delBtn').onclick = deleteEvent;
+$('settingsBtn').onclick = openSettings;
+$('sCancel').onclick = () => $('setModal').classList.remove('open');
+$('sSave').onclick = saveSettings;
+$('copyInvite').onclick = async () => {
+  try { await navigator.clipboard.writeText($('inviteLink').textContent); $('copyInvite').textContent = '복사됨 ✓'; }
+  catch (e) { $('copyInvite').textContent = '직접 복사해 주세요'; }
+  setTimeout(() => ($('copyInvite').textContent = '초대 링크 복사'), 2000);
+};
+$('leaveBtn').onclick = () => {
+  const b = $('leaveBtn');
+  if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 나가기'; return; }
+  store('team', null); location.reload();
+};
+['evModal', 'setModal'].forEach((id) => { $(id).onclick = (e) => { if (e.target.id === id) $(id).classList.remove('open'); }; });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { $('evModal').classList.remove('open'); $('setModal').classList.remove('open'); }
+  if (e.key === 'Enter' && $('evModal').classList.contains('open') && e.target.tagName !== 'TEXTAREA') saveEvent();
+});
+$('grid').onclick = (e) => {
+  const evEl = e.target.closest('.ev');
+  if (evEl) { const ev = events.find((x) => x.id === evEl.dataset.id); if (ev) openEvent(ev); return; }
+  const dayEl = e.target.closest('.day');
+  if (dayEl) openEvent({ start: dayEl.dataset.date, end: dayEl.dataset.date });
+};
+$('filters').onclick = (e) => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const set = c.dataset.kind === 'p' ? hidePeople : hideTypes;
+  set.has(c.dataset.name) ? set.delete(c.dataset.name) : set.add(c.dataset.name);
+  renderFilters(); renderGrid();
+};
+
+// 앱 설치(홈 화면 추가) 지원
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
