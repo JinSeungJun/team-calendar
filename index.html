@@ -63,6 +63,11 @@
   .field input, .field select, .field textarea { border:1px solid var(--line); border-radius:6px; padding:7px 8px; width:100%; background:#fff; }
   .field textarea { resize:vertical; min-height:56px; }
   .help { font-size:12px; color:var(--sub); line-height:1.5; }
+  .srow { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .srow input[type=color] { width:36px; height:34px; padding:2px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; flex:none; }
+  .srow .sname { flex:1; min-width:0; border:1px solid var(--line); border-radius:6px; padding:7px 8px; }
+  .srow .sdel { padding:6px 9px; color:var(--sub); flex:none; }
+  .sadd { align-self:flex-start; font-size:13px; padding:5px 10px; }
   .actions { display:flex; gap:8px; margin-top:6px; align-items:center; }
   .meta { font-size:11px; color:var(--sub); margin-top:8px; }
   .err { color:#c0392b; font-size:12px; min-height:16px; }
@@ -148,15 +153,17 @@
 <div class="backdrop" id="setModal">
   <div class="modal">
     <h2>설정</h2>
-    <div class="row"><div class="field">
-      <label>팀원 (한 줄에 한 명: 이름 색상)</label>
-      <textarea id="sPeople" rows="5" placeholder="홍길동 #4F7DF3&#10;김철수 #E8743B"></textarea>
-    </div></div>
-    <div class="row"><div class="field">
-      <label>구분 (한 줄에 하나: 이름 색상)</label>
-      <textarea id="sTypes" rows="5" placeholder="회의 #2F6FED&#10;외근 #D97706"></textarea>
-    </div></div>
-    <div class="help">색상은 생략하면 자동으로 정해져요. 색상 코드는 # 다음 6자리 (예: #E8743B)</div>
+    <div class="field" style="margin-bottom:12px">
+      <label>팀원</label>
+      <div class="slist" id="sPeople"></div>
+      <button class="sadd" data-target="sPeople" data-ph="이름">+ 팀원 추가</button>
+    </div>
+    <div class="field" style="margin-bottom:8px">
+      <label>구분</label>
+      <div class="slist" id="sTypes"></div>
+      <button class="sadd" data-target="sTypes" data-ph="구분 이름">+ 구분 추가</button>
+    </div>
+    <div class="help">색은 자동으로 정해지고, 왼쪽 색 네모를 누르면 바꿀 수 있어요. 이름 칸에 "철수, 영희, 민수"처럼 쉼표로 여러 명을 한 번에 넣어도 돼요.</div>
     <div class="err" id="sErr"></div>
     <div class="actions">
       <div class="spacer"></div>
@@ -419,27 +426,43 @@ async function deleteEvent() {
 function alertBox(msg) { $('sync').textContent = '⚠ ' + msg; $('sync').classList.add('off'); }
 
 // ===== 설정 모달 =====
-function toLines(list) { return list.map((x) => x.name + ' ' + x.color).join('\n'); }
-function parseLines(text) {
+function rowHtml(x, ph) {
+  return '<div class="srow"><input type="color" value="' + esc(x.color) + '" aria-label="색상">'
+    + '<input class="sname" value="' + esc(x.name) + '" placeholder="' + esc(ph) + '" maxlength="100">'
+    + '<button class="sdel" aria-label="삭제">✕</button></div>';
+}
+function usedColors(el) { return [...el.querySelectorAll('input[type=color]')].map((i) => i.value.toUpperCase()); }
+function nextColor(used) { return PALETTE.find((c) => !used.includes(c)) || PALETTE[used.length % PALETTE.length]; }
+function addRow(listId, ph, focus) {
+  const el = $(listId);
+  el.insertAdjacentHTML('beforeend', rowHtml({ name: '', color: nextColor(usedColors(el)) }, ph));
+  if (focus) el.lastElementChild.querySelector('.sname').focus();
+}
+function collect(listId) {
   const out = [], seen = new Set();
-  text.split('\n').forEach((line) => {
-    const t = line.trim(); if (!t) return;
-    const mm = t.match(/^(.*?)[\s,]*(#[0-9a-fA-F]{6})?$/);
-    const name = (mm ? mm[1] : t).trim().slice(0, 30);
-    if (!name || seen.has(name)) return;
-    seen.add(name);
-    out.push({ name, color: mm && mm[2] && isHex(mm[2]) ? mm[2].toUpperCase() : PALETTE[out.length % PALETTE.length] });
+  const used = usedColors($(listId));
+  $(listId).querySelectorAll('.srow').forEach((row) => {
+    const color = row.querySelector('input[type=color]').value.toUpperCase();
+    row.querySelector('.sname').value.split(/[,，]/).forEach((part, i) => {
+      const name = part.trim().slice(0, 30);
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      let c = color;
+      if (i > 0) { c = nextColor(used); used.push(c); } // 쉼표로 여러 명 넣으면 각자 다른 색
+      out.push({ name, color: isHex(c) ? c : PALETTE[0] });
+    });
   });
   return out;
 }
 function openSettings() {
-  $('sPeople').value = toLines(settings.people);
-  $('sTypes').value = toLines(settings.types);
+  $('sPeople').innerHTML = settings.people.map((x) => rowHtml(x, '이름')).join('');
+  $('sTypes').innerHTML = settings.types.map((x) => rowHtml(x, '구분 이름')).join('');
+  if (!settings.people.length) addRow('sPeople', '이름', false);
   $('sErr').textContent = '';
   $('setModal').classList.add('open');
 }
 async function saveSettings() {
-  const people = parseLines($('sPeople').value), types = parseLines($('sTypes').value);
+  const people = collect('sPeople'), types = collect('sTypes');
   if (!types.length) return ($('sErr').textContent = '구분은 최소 1개 있어야 해요.');
   try {
     const p = setDoc(doc(db, 'teams', team, 'meta', 'settings'), { people, types, updatedAt: serverTimestamp() });
@@ -460,6 +483,13 @@ $('delBtn').onclick = deleteEvent;
 $('settingsBtn').onclick = openSettings;
 $('sCancel').onclick = () => $('setModal').classList.remove('open');
 $('sSave').onclick = saveSettings;
+document.querySelectorAll('.sadd').forEach((b) => { b.onclick = () => addRow(b.dataset.target, b.dataset.ph, true); });
+['sPeople', 'sTypes'].forEach((id) => {
+  $(id).onclick = (e) => { if (e.target.classList.contains('sdel')) e.target.closest('.srow').remove(); };
+  $(id).addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.classList.contains('sname')) { e.preventDefault(); addRow(id, id === 'sPeople' ? '이름' : '구분 이름', true); }
+  });
+});
 $('copyInvite').onclick = async () => {
   try { await navigator.clipboard.writeText($('inviteLink').textContent); $('copyInvite').textContent = '복사됨 ✓'; }
   catch (e) { $('copyInvite').textContent = '직접 복사해 주세요'; }
