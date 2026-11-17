@@ -67,6 +67,8 @@
   .srow input[type=color] { width:36px; height:34px; padding:2px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; flex:none; }
   .srow .sname { flex:1; min-width:0; border:1px solid var(--line); border-radius:6px; padding:7px 8px; }
   .srow .sdel { padding:6px 9px; color:var(--sub); flex:none; }
+  .copybtn { white-space:nowrap; flex:none; }
+  code.big { user-select:all; }
   .sadd { align-self:flex-start; font-size:13px; padding:5px 10px; }
   .actions { display:flex; gap:8px; margin-top:6px; align-items:center; }
   .meta { font-size:11px; color:var(--sub); margin-top:8px; }
@@ -200,14 +202,25 @@
     </div>
     <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
     <div class="field">
-      <label>팀원 초대 링크 (이 링크로 들어오면 팀 코드 입력 없이 바로 입장)</label>
-      <code class="big" id="inviteLink"></code>
+      <label>팀 코드 (PC 위젯·안드로이드 앱 첫 화면에 입력)</label>
+      <div class="row" style="margin:0;align-items:center">
+        <code class="big" id="teamCode" style="flex:1;margin:0"></code>
+        <button class="copybtn" data-copy="code">코드 복사</button>
+      </div>
     </div>
-    <div class="actions">
-      <button id="copyInvite">초대 링크 복사</button>
+    <div class="field" style="margin-top:10px">
+      <label>초대 링크 (웹·폰 브라우저에서 열면 바로 입장)</label>
+      <div class="row" style="margin:0;align-items:center">
+        <code class="big" id="inviteLink" style="flex:1;margin:0;font-size:12px"></code>
+        <button class="copybtn" data-copy="link">링크 복사</button>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button class="primary copybtn" data-copy="msg">초대 안내문 전체 복사</button>
       <div class="spacer"></div>
       <button class="danger" id="leaveBtn">이 기기에서 팀 나가기</button>
     </div>
+    <div class="help" style="margin-top:6px">안내문에는 코드·링크·PC 위젯/안드로이드 앱 받는 곳이 다 들어 있어서, 카톡으로 그대로 보내면 돼요.</div>
   </div>
 </div>
 
@@ -262,7 +275,7 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('여기에')) {
 
   onAuthStateChanged(auth, (user) => {
     if (!user) return;
-    if (team) startTeam(team); else showGate('팀 코드 입력', WIDGET ? '웹 캘린더 ⚙ 설정의 "초대 링크"를 복사해서 아래에 붙여넣고 입장을 눌러 주세요. (처음 한 번만)' : '팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요. 처음 쓰는 거라면 "새 팀 만들기"를 누르세요.', true);
+    if (team) startTeam(team); else showGate('팀 코드 입력', WIDGET ? '팀 코드(또는 초대 링크)를 붙여넣고 입장을 눌러 주세요. 처음 한 번만 하면 돼요.' : '팀장에게 받은 팀 코드나 초대 링크로 들어와 주세요. 처음 쓰는 거라면 "새 팀 만들기"를 누르세요.', true);
   });
   signInAnonymously(auth).catch((e) => {
     showGate('로그인 실패', 'Firebase 익명 로그인을 켰는지 확인해 주세요. (' + (e.code || e.message) + ')', false);
@@ -313,6 +326,7 @@ function startTeam(code) {
   try { APP && APP.setTeam(code); } catch (e) {}
   $('gate').classList.add('hidden');
   $('app').classList.remove('hidden');
+  $('teamCode').textContent = code;
   $('inviteLink').textContent = location.origin + location.pathname.replace(/index\.html$/, '') + '#team=' + code;
 
   if (unsubSettings) unsubSettings();
@@ -541,14 +555,36 @@ document.querySelectorAll('.sadd').forEach((b) => { b.onclick = () => addRow(b.d
     if (e.key === 'Enter' && e.target.classList.contains('sname')) { e.preventDefault(); addRow(id, id === 'sPeople' ? '이름' : '구분 이름', true); }
   });
 });
-$('copyInvite').onclick = async () => {
-  try {
-    if (APP) APP.copy($('inviteLink').textContent); else await navigator.clipboard.writeText($('inviteLink').textContent);
-    $('copyInvite').textContent = '복사됨 ✓';
-  }
-  catch (e) { $('copyInvite').textContent = '직접 복사해 주세요'; }
-  setTimeout(() => ($('copyInvite').textContent = '초대 링크 복사'), 2000);
-};
+function inviteMessage() {
+  return [
+    '📅 ' + APP_TITLE + ' 초대',
+    '',
+    '■ 팀 코드: ' + team,
+    '',
+    '■ 웹·폰 브라우저 (링크 열면 바로 입장)',
+    $('inviteLink').textContent,
+    '',
+    '■ PC 바탕화면 위젯 (exe 받아서 실행 → 팀 코드 입력)',
+    'https://github.com/JinSeungJun/team-calendar/releases/latest',
+    '',
+    '■ 안드로이드 앱 + 홈 화면 위젯 (apk 설치 → 팀 코드 입력)',
+    'https://github.com/JinSeungJun/team-calendar/releases',
+    '',
+    '※ "새 팀 만들기"는 누르지 마세요!'
+  ].join('\n');
+}
+document.querySelectorAll('.copybtn').forEach((b) => {
+  const label = b.textContent;
+  b.onclick = async () => {
+    const kind = b.dataset.copy;
+    const text = kind === 'code' ? team : kind === 'link' ? $('inviteLink').textContent : inviteMessage();
+    try {
+      if (APP) APP.copy(text); else await navigator.clipboard.writeText(text);
+      b.textContent = '복사됨 ✓';
+    } catch (e) { b.textContent = '복사 실패'; }
+    setTimeout(() => (b.textContent = label), 2000);
+  };
+});
 $('leaveBtn').onclick = () => {
   const b = $('leaveBtn');
   if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '한 번 더 누르면 나가기'; return; }
